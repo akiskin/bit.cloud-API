@@ -1,2 +1,2 @@
 # bit.cloud-API
-bit.cloud API
+See Wiki
