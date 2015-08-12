@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Вход в BIT.Cloud</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+
+    <script src="//code.jquery.com/jquery-1.10.2.min.js"></script>
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+	<script src="//www.jsviews.com/download/jsrender.js"></script>
+	
+	<script src="api_urls.js" type="text/javascript" encoding="UTF-8"></script>
+	
+	<script type="text/javascript">
+		$(window).load(function(){
+			$('#myModal').modal('show');
+		});
+	</script> 
+
+
+	<script type="text/javascript">
+	var locusername = "";
+	var locpassword = "";
+	
+	var availabletariffs = [];
+	
+	//helper to get GET PARAMS
+	function getParameterByName(name) {
+		var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+		return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+	}
+	
+	
+	function authenticate() {
+		$.ajax({
+			url: privateapiurl() + "/authenticate",
+			username: locusername,
+			password: locpassword
+		}).done(function(data, textStatus, jqXHR) {
+			$('#glNonAuthVisibility').hide();
+
+			$('#myModal').modal('hide');
+			
+			$('#glAuthVisibility').show();
+			
+			myapplications();
+			$('#tab_main_myapplications_btnrefresh').click(function() {myapplications()});
+
+			mytariffs();
+			$('#tab_main_mytariffs_btnrefresh').click(function() {mytariffs()});
+			$('#tab_main_mytariffs_btnadd').click(function() {addtariff_prepare()});
+
+			mybalance();
+			$('#tab_main_balance_btnrefresh').click(function() {mybalance()});
+			
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			$("#login-form").shake(4,5,300);
+			$("#loginLink").tooltip('show');
+			//$("#resulttext" ).text("Unable to start recovery list ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	}
+
+
+
+
+	function myapplications() {
+		$.ajax({
+			url: privateapiurl() + "/myapplications",
+			username: locusername,
+			password: locpassword
+		}).done(function(data, textStatus, jqXHR) {
+			
+			var myTemplate = $.templates("#template_myapplications_content");
+			$("#tab_main_myapplications_content_tablebody").html(myTemplate.render(data));
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to get application list ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	}
+
+	
+	
+	
+	function mytariffs() {
+		$.ajax({
+			url: privateapiurl() + "/mytariffs",
+			username: locusername,
+			password: locpassword
+		}).done(function(data, textStatus, jqXHR) {
+			
+			var myTemplate = $.templates("#template_mytariffs_content");
+			$("#tab_main_mytariffs_content_tablebody").html(myTemplate.render(data));
+			
+			//Забиндим события на появившиеся кнопки
+			$(".ActionModifyTariff").off("click");
+			$(".ActionModifyTariff").click(function() {
+				
+				tariff = $(this).attr("data");
+				
+				//Go get tariff parameters
+				$.ajax({
+					url: publicapiurl() + "/tariffs/" + tariff
+				}).done(function(globaltariffdata, textStatus, jqXHR) {
+					
+					//Go get client current tariff parameters
+					$.ajax({
+						url: privateapiurl() + "/mytariffs/" + tariff,
+						username: locusername,
+						password: locpassword
+					}).done(function(clienttariffdata, textStatus, jqXHR) {
+					
+						$("#modifytariffwizard_input_tariff").val(tariff);
+						
+						
+						//modules in use
+						var modulesinuse = [];
+						$.each(clienttariffdata.Modules, function(i, item) {
+							modulesinuse.push(item.Id);
+						});
+						//enrich globaltariffdata with client data (flag Inuse)
+						$.each(globaltariffdata.Modules, function(i, item) {
+							if ($.inArray(item.Id, modulesinuse) >= 0) {globaltariffdata.Modules[i].Inuse = true;} else {globaltariffdata.Modules[i].Inuse = false;}
+						});
+						
+						
+						//options in use
+						var optionsinuse = [];
+						$.each(clienttariffdata.Options, function(i, item) {
+							optionsinuse.push(item.Id);
+						});
+						//enrich globaltariffdata with client data (flag Inuse)
+						$.each(globaltariffdata.Options, function(i, item) {
+							if ($.inArray(item.Id, optionsinuse) >= 0) {globaltariffdata.Options[i].Inuse = true;} else {globaltariffdata.Options[i].Inuse = false;}
+						});
+					
+						
+						//show modules
+						var myTemplate = $.templates("#template_modifytariffwizard_modules_content");
+						$("#modifytariffwizard_modules_content").html(myTemplate.render(globaltariffdata.Modules));
+						
+						//show options
+						if (globaltariffdata.Options.length > 0) {
+							var myTemplate = $.templates("#template_modifytariffwizard_options_content");
+							$("#modifytariffwizard_options_content").html(myTemplate.render(globaltariffdata.Options));
+						} else {
+							$("#modifytariffwizard_options_content").html("<i>Нет доступных опций</i>");
+						}
+						
+						//show nusers
+						$("#modifytariffwizard_input_nusers").val(clienttariffdata.Nusers);
+						
+						//show window
+						$("#modifytariffwizard").modal('show');
+						
+						$("#modifytariffwizard_action_getquote").off("click");
+						$("#modifytariffwizard_action_getquote").click(function() {getquote()});
+						
+						
+						$(".priceChangeTrigger").off("change");
+						$(".priceChangeTrigger").change(function() {getquote()});
+						
+						
+						$("#modifytariffwizard_action_post").removeClass("disabled");
+						$("#modifytariffwizard_action_post").off("click");
+						$("#modifytariffwizard_action_post").click(function() {
+							$("#modifytariffwizard_action_post").addClass("disabled");
+							modifytariff();
+						});
+						
+						
+						getquote();
+						
+					});
+				});
+			});
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to get my tariffs list ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	}
+
+	
+	
+
+	function mybalance() {
+		$.ajax({
+			url: privateapiurl() + "/finance/balance",
+			username: locusername,
+			password: locpassword
+		}).done(function(data, textStatus, jqXHR) {
+			
+			var myTemplate = $.templates("#template_balance_content");
+			$("#tab_main_balance_content").html(myTemplate.render(data));
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to get my tariffs list ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	}
+
+
+
+	function getquote() {
+	
+		var tariffId = $("#modifytariffwizard_input_tariff").val();
+	
+		var data = {};
+		data.modules = [];
+		data.options = [];
+		data.nusers = $("#modifytariffwizard_input_nusers").val();
+		
+		$(".modifytariffwizard_input_module:checked").each(function() {
+			data.modules.push( $(this).attr("data") )
+		});
+		$(".modifytariffwizard_input_option:checked").each(function() {
+			data.options.push( $(this).attr("data") )
+		});
+
+	
+		$.ajax({
+			url: publicapiurl() + "/tariffs/"+tariffId+"/quote",
+			data: {"data" : JSON.stringify(data)}
+		}).done(function(data, textStatus, jqXHR) {
+			
+			var myTemplate = $.templates("#template_modifytariffwizard_totalprice");
+			$("#modifytariffwizard_totalprice").html(myTemplate.render(data));
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to get quote ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	
+	}
+
+	
+	function getquote_addtariff() {
+	
+		var tariffId = $("#addtariffwizard_input_tariff").val();
+	
+		var data = {};
+		data.modules = [];
+		data.options = [];
+		data.nusers = $("#addtariffwizard_input_nusers").val();
+		
+		$(".addtariffwizard_input_module:checked").each(function() {
+			data.modules.push( $(this).attr("data") )
+		});
+		$(".addtariffwizard_input_option:checked").each(function() {
+			data.options.push( $(this).attr("data") )
+		});
+
+	
+		$.ajax({
+			url: publicapiurl() + "/tariffs/"+tariffId+"/quote",
+			data: {"data" : JSON.stringify(data)}
+		}).done(function(data, textStatus, jqXHR) {
+			
+			var myTemplate = $.templates("#template_addtariffwizard_totalprice");
+			$("#addtariffwizard_totalprice").html(myTemplate.render(data));
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to get quote ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	
+	}	
+
+	
+	
+	
+	function addtariff() {
+	
+		var tariffId = $("#addtariffwizard_input_tariff").val();
+	
+		var data = {};
+		data.modules = [];
+		data.options = [];
+		data.nusers = $("#addtariffwizard_input_nusers").val();
+		data.title = $("#addtariffwizard_input_title").val();
+		data.timezone = $("#addtariffwizard_input_timezone").val();
+		
+		$(".addtariffwizard_input_module:checked").each(function() {
+			data.modules.push( $(this).attr("data") )
+		});
+		$(".addtariffwizard_input_option:checked").each(function() {
+			data.options.push( $(this).attr("data") )
+		});
+
+	
+		$.ajax({
+			url: privateapiurl() + "/mytariffs/"+tariffId+"/add",
+			data: {"data" : JSON.stringify(data)}
+		}).done(function(data, textStatus, jqXHR) {
+		
+			$("#addtariffwizard").modal('hide');
+			mytariffs();
+			myapplications();
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to add tariff ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+			$("#addtariffwizard_action_post").removeClass("disabled");
+		});
+	
+	}
+
+
+	
+	function addtariff_prepare() {
+		$.ajax({
+			url: publicapiurl() + "/tariffs"
+		}).done(function(data, textStatus, jqXHR) {
+			
+			//set global var for further use
+			availabletariffs = data;
+			
+			var myTemplate = $.templates("#template_addtariffwizard_body_select_tarifflist");
+			$("#addtariffwizard_body_select_tarifflist").html(myTemplate.render(availabletariffs));
+			
+			//Забиндим события на появившиеся элементы
+			$(".addtariffwizard_body_select_element").off("click");
+			$(".addtariffwizard_body_select_element").click(function() {
+				
+				$("#addtariffwizard_body_select_tarifflist > a.addtariffwizard_body_select_element").removeClass("list-group-item-success");
+				$(this).addClass("list-group-item-success");
+				
+				
+				$("#addtariffwizard_action_post").removeClass("disabled");
+				
+				
+				tariff = $(this).attr("data");
+				$("#addtariffwizard_input_tariff").val(tariff);
+				
+				//find tariff in global var
+				var currenttariff = {};
+				$.each(availabletariffs, function(i, item){
+					if (item.TariffId == tariff) {
+						currenttariff = availabletariffs[i];
+						return false;
+					}
+				});
+				
+				
+				
+				//show modules
+				var myTemplate = $.templates("#template_addtariffwizard_modules_content");
+				$("#addtariffwizard_modules_content").html(myTemplate.render(currenttariff.Modules));
+				
+				//show options
+				if (currenttariff.Options.length > 0) {
+					var myTemplate = $.templates("#template_addtariffwizard_options_content");
+					$("#addtariffwizard_options_content").html(myTemplate.render(currenttariff.Options));
+				} else {
+					$("#addtariffwizard_options_content").html("<i>Нет доступных опций</i>");
+				}
+				
+				//show nusers
+				$("#addtariffwizard_input_nusers").val(1);
+				
+				//show window
+				$("#addtariffwizard_body_adjust").show();
+				
+				
+				//bind actions
+				$("#addtariffwizard_action_getquote").off("click");
+				$("#addtariffwizard_action_getquote").click(function() {getquote_addtariff()});
+				
+				
+				$(".priceChangeTrigger").off("change");
+				$(".priceChangeTrigger").change(function() {getquote_addtariff()});
+				
+				$("#addtariffwizard_action_post").off("click");
+				$("#addtariffwizard_action_post").click(function() {
+					
+					
+					$("#addtariffwizard_action_post").addClass("disabled");
+					addtariff();
+					
+				});
+				
+				getquote_addtariff();
+				
+				
+			});
+			
+			
+			$("#addtariffwizard_body_select").show();
+			$("#addtariffwizard_body_adjust").hide();
+			
+			$("#addtariffwizard").modal('show');
+
+			
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to get quote ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	
+	}
+
+
+	
+	function modifytariff() {
+	
+		var tariffId = $("#modifytariffwizard_input_tariff").val();
+	
+		var data = {};
+		data.modules = [];
+		data.options = [];
+		data.nusers = $("#modifytariffwizard_input_nusers").val();
+		
+		$(".modifytariffwizard_input_module:checked").each(function() {
+			data.modules.push( $(this).attr("data") )
+		});
+		$(".modifytariffwizard_input_option:checked").each(function() {
+			data.options.push( $(this).attr("data") )
+		});
+
+	
+		$.ajax({
+			url: privateapiurl() + "/mytariffs/"+tariffId+"/modify",
+			data: {"data" : JSON.stringify(data)}
+		}).done(function(data, textStatus, jqXHR) {
+		
+			$("#modifytariffwizard").modal('hide');
+			mytariffs();
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to modify tariff ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+			$("#modifytariffwizard_action_post").removeClass("disabled");
+		});
+	
+	}
+
+
+
+
+
+
+
+
+	
+	
+	$( document ).ready(function() {
+	
+		$('[data-toggle="tooltip"]').tooltip();
+		$('#glNonAuthVisibility').show();
+		
+		$('#glAuthVisibility').hide();
+		$('#modifytariffwizard').modal('hide');
+		
+		jQuery.fn.shake = function(intShakes, intDistance, intDuration) {
+			this.each(function() {
+				$(this).css("position","relative"); 
+				for (var x=1; x<=intShakes; x++) {
+					$(this).animate({left:(intDistance*-1)}, (((intDuration/intShakes)/4)))
+					.animate({left:intDistance}, ((intDuration/intShakes)/2))
+					.animate({left:0}, (((intDuration/intShakes)/4)));
+				}
+			});
+		return this;
+		};
+	
+		$("#loginLink").click(function() {
+		
+			locusername = $("#username").val();
+			locpassword = $("#password").val();
+
+			if ((locusername != "") & (locpassword != "")) {
+				$("#loginLink").tooltip('hide');
+				authenticate();
+			} else {
+				$("#login-form").shake(4,5,300);
+				$("#loginLink").tooltip('show');
+			}
+		});
+		
+		login = getParameterByName("login");
+		if (login != null) {
+			$("#username").val(login);
+		}
+ 		
+	});
+	</script>	
+	
+</head>
+<body>
+	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+
+<!-- NON AUTH VISIBILITY -->
+<div id="glNonAuthVisibility" class="container">
+	<button type="button" class="btn btn-primary btn-lg btn-block" data-toggle="modal" data-target="#myModal">
+	  Начать пользоваться сервисом
+	</button>
+</div>
+
+<!-- Modal login -->
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+  <div class="modal-dialog" role="document">
+	<div class="modal-content" id="login-form">
+	  <div class="modal-header">
+		  <button type="button" class="close" data-dismiss="modal">X</button>
+		  <h4 class="modal-title" id="myModalLabel">Вход в BIT.Cloud</h4>
+	  </div>
+	  <div class="modal-body">
+		  <div class="row">
+			  <div class="col-xs-6">
+				  <div class="well">
+					  <form id="loginForm" method="POST" action="/login/" novalidate="novalidate">
+						  <div class="form-group">
+							  <label for="username" class="control-label">Логин</label>
+							  <input type="text" class="form-control" id="username" name="username" value="" required="" title="Логин" placeholder="example@gmail.com">
+							  <span class="help-block"></span>
+						  </div>
+						  <div class="form-group">
+							  <label for="password" class="control-label">Пароль</label>
+							  <input type="password" class="form-control" id="password" name="password" value="" required="" title="Пароль">
+							  <span class="help-block"></span>
+						  </div>
+						  <button type="button" id="loginLink" class="btn btn-success btn-block" data-toggle="tooltip" data-placement="right" data-title="Неверные данные для входа" data-trigger="manual">Вход</button>
+						  <a href="forgot.htm" class="btn btn-link btn-block">Восстановление доступа</a>
+					  </form>
+				  </div>
+			  </div>
+			  <div class="col-xs-6">
+				  <p class="lead">Зарегистрируйтесь сейчас <span class="text-success">БЕСПЛАТНО</span></p>
+				  <ul class="list-unstyled" style="line-height: 2">
+					  <li><span class="fa fa-check text-success"></span> See all your orders</li>
+					  <li><span class="fa fa-check text-success"></span> Fast re-order</li>
+					  <li><span class="fa fa-check text-success"></span> Save your favorites</li>
+					 <li><a href="/read-more/"><u>Read more</u></a></li>
+				  </ul>
+				  <p><a href="new-customer.htm" class="btn btn-info btn-block">Зарегистрироваться</a></p>
+			  </div>
+		  </div>
+	  </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Закрыть</button>
+        <button type="button" class="btn btn-primary">Узнать больше</button>
+      </div>
+	</div>
+  </div>
+</div> 
+ 
+ 
+<!-- AUTH VISIBILITY - TABS-->
+
+ <div id="glAuthVisibility" class="container">
+    <img class="img-responsive center-block" src="http://www.prorab.ru/images/head.jpg">
+    <div id="content">
+        <ul id="tabs" class="nav nav-tabs" data-tabs="tabs">
+            <li class="active"><a href="#tab_main" data-toggle="tab">Главное</a></li>
+            <li><a href="#tab_tariffs" data-toggle="tab">Тарифы</a></li>
+            <li><a href="#tab_employees" data-toggle="tab">Сотрудники</a></li>
+            <li><a href="#tab_support" data-toggle="tab">Поддержка</a></li>
+        </ul>
+        <div id="my-tab-content" class="tab-content">
+            <div class="tab-pane active" id="tab_main">
+                <h1>Main info</h1>
+				<div id="tab_main_myapplications_content">
+					<h2>Мои приложения</h2>
+					<button type="button" class="btn btn-success" id="tab_main_myapplications_btnrefresh">Обновить</button>
+					<table class="table">
+					<thead>
+					  <tr>
+						<th>Имя</th>
+						<th>Статус</th>
+						<th>Адрес</th>
+					  </tr>
+					</thead>
+					<tbody id="tab_main_myapplications_content_tablebody">
+					</tbody>
+				  	<script id="template_myapplications_content" type="text/x-jsrender">
+						<tr>
+							<td>{{:ScopeName}}</td>
+							<td>{{:ScopeStatus}}</td>
+							<td><a href="{{:ScopeURL}}">{{:ScopeURL}}</a></td>
+						</tr>
+					</script>
+					</table>				
+				</div>
+            </div>
+            <div class="tab-pane" id="tab_tariffs">
+                <h1>Тарифы и баланс</h1>
+				<div id="tab_main_mytariffs_content">
+					<h2>Мои тарифы</h2>
+					<button type="button" class="btn btn-primary" id="tab_main_mytariffs_btnrefresh">Обновить</button>
+					<button type="button" class="btn btn-warning" id="tab_main_mytariffs_btnadd">Новый тариф</button>
+					<table class="table">
+					<thead>
+					  <tr>
+						<th>Отменен</th>
+						<th>Заблокирован</th>
+						<th>Название</th>
+						<th>Модули</th>
+						<th>Опции</th>
+						<th>Цена</th>
+						<th></th>
+					  </tr>
+					</thead>
+					<tbody id="tab_main_mytariffs_content_tablebody">
+					</tbody>
+				  	<script id="template_mytariffs_content" type="text/x-jsrender">
+						<tr>
+							<td>{{:Canceled}}</td>
+							<td>{{:Blocked}}</td>
+							<td><strong>{{:Tariff.Name}}</strong><br />
+							Длительность: <strong>{{:Tariff.Periodicity}}</strong><br />
+							Пользователей: <strong>{{:Nusers}}</strong><br />
+							</td>
+							<td>
+								{{for Modules}}
+									{{:Name}}<br />
+								{{/for}}
+							</td>
+								{{for Options}}
+									{{:Name}}<br />
+								{{/for}}
+							<td></td>
+							<td>{{:Cost}}</td>
+							<td><button type="button" class="btn btn-warning ActionModifyTariff" data="{{:Tariff.Id}}">Изменить</button></td>
+						</tr>
+					</script>
+					</table>				
+				</div>
+				
+				
+				<div id="tab_main_finance_content">
+					<h2>Мое финансовое состояние</h2>
+					<button type="button" class="btn btn-success" id="tab_main_balance_btnrefresh">Обновить</button>
+					<div id="tab_main_balance_content"></div>
+				  	<script id="template_balance_content" type="text/x-jsrender">
+					Текущий баланс: {{:Balance}}<br />
+					{{if Overdraft > 0}}Макс. овердарфт: {{:Overdraft}}{{/if}}
+					</script>
+				</div>
+
+				
+			</div>
+            <div class="tab-pane" id="tab_employees">
+                <h1>Сотрудники и права</h1>
+                <p>yellow yellow yellow yellow yellow</p>
+            </div>
+            <div class="tab-pane" id="tab_support">
+                <h1>Поддержка и FAQ</h1>
+                <p>green green green green green</p>
+            </div>
+        </div>
+    </div>
+</div> 
+ 
+<!-- MODAL - EDIT TARIFF -->
+<div id="modifytariffwizard" class="modal fade" tabindex="-1" role="dialog">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal">X</button>
+				<h4 class="modal-title">Изменение тарифа</h4>
+			</div>
+			<div class="modal-body">
+				<input type="hidden" class="priceChangeTrigger" id="modifytariffwizard_input_tariff">
+				<p class="bg-info">Выберите модули</p> 
+				<div id="modifytariffwizard_modules_content"></div>
+				
+				<script id="template_modifytariffwizard_modules_content" type="text/x-jsrender">
+				<div class="checkbox {{if Mandatory }}disabled{{/if}}"><label><input type="checkbox" {{if Mandatory }}disabled{{/if}} {{if Inuse}}checked="checked"{{/if}} class="modifytariffwizard_input_module priceChangeTrigger" data="{{:Id}}">{{:Name}} {{if Mandatory }}(обязательно){{/if}}</label></div>
+				</script>
+
+				<p class="bg-info">Выберите опции</p>
+				<div id="modifytariffwizard_options_content"></div>
+				
+				<script id="template_modifytariffwizard_options_content" type="text/x-jsrender">
+				<div class="checkbox"><label><input type="checkbox" {{if Inuse}}checked="checked"{{/if}} class="modifytariffwizard_input_option priceChangeTrigger" data="{{:Id}}">{{:Name}}</label></div>
+				</script>
+				
+				<div class="form-group">
+				<p class="bg-info">Укажите количество пользователей</p>
+				<input class="form-control priceChangeTrigger" id="modifytariffwizard_input_nusers" type="text" placeholder="сколько будет пользователей (число)">
+				</div>
+				
+				<div class="alert alert-info" id="modifytariffwizard_totalprice"></div>				
+				
+				<script id="template_modifytariffwizard_totalprice" type="text/x-jsrender">
+				{{if Cost > 0}}	
+					Итого: <strong>{{:Cost}}</strong>
+				{{else}}
+					{{:Error}} 
+				{{/if}}
+				</script>
+				
+				<button type="button" class="btn btn-info" id="modifytariffwizard_action_getquote">Пересчитать стоимость</button>
+				<button type="button" class="btn btn-success" id="modifytariffwizard_action_post">Применить</button>
+			</div>
+		</div>
+	</div>	
+</div> 
+ 
+ 
+ 
+<!-- MODAL - ADD TARIFF -->
+<div id="addtariffwizard" class="modal fade" tabindex="-1" role="dialog">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal">X</button>
+				<h4 class="modal-title">Добавление тарифа</h4>
+			</div>
+			<div class="modal-body" id="addtariffwizard_body_select">
+				<div class="list-group" id="addtariffwizard_body_select_tarifflist"></div>
+				<script id="template_addtariffwizard_body_select_tarifflist" type="text/x-jsrender">
+					<a href="#" class="list-group-item addtariffwizard_body_select_element" data="{{:TariffId}}"><span class="badge">новый!</span>{{:TariffName}}</a>
+				</script>	
+			</div>
+			<div class="modal-body" id="addtariffwizard_body_adjust">
+				<input type="hidden" class="priceChangeTrigger" id="addtariffwizard_input_tariff">
+				
+				<ul class="list-group">
+					
+					<li class="list-group-item">
+					Дайте название базе: <input class="form-control" id="addtariffwizard_input_title" type="text" placeholder="любое удобное для вас название">
+					Часовой пояс: <input class="form-control" id="addtariffwizard_input_timezone" type="text" placeholder="часовой пояс базы" value="Europe/Moscow" readonly>
+					</li>
+					
+					<li class="list-group-item">
+					<p class="bg-info">Выберите модули</p>
+					<div id="addtariffwizard_modules_content"></div>
+					
+					<script id="template_addtariffwizard_modules_content" type="text/x-jsrender">
+					<div class="checkbox {{if Mandatory }}disabled{{/if}}"><label><input type="checkbox" {{if Mandatory }}disabled checked="checked"{{/if}}  class="addtariffwizard_input_module priceChangeTrigger" data="{{:Id}}">{{:Name}} {{if Mandatory }}(обязательно){{/if}}</label></div>
+					</script>
+					</li>
+					
+					<li class="list-group-item">
+					<p class="bg-info">Выберите опции</p> 
+					<div id="addtariffwizard_options_content"></div>
+					
+					<script id="template_addtariffwizard_options_content" type="text/x-jsrender">
+					<div class="checkbox"><label><input type="checkbox" checked="checked" class="addtariffwizard_input_option priceChangeTrigger" data="{{:Id}}">{{:Name}}</label></div>
+					</script>
+					</li>
+					
+					<li class="list-group-item">
+					<div class="form-group">
+					<p class="bg-info">Укажите количество пользователей</p>
+					<input class="form-control priceChangeTrigger" id="addtariffwizard_input_nusers" type="text" placeholder="сколько будет пользователей (число)">
+					</div>
+					</li>
+				</ul>	
+				
+				<div class="alert alert-info" id="addtariffwizard_totalprice"></div>				
+				
+				<script id="template_addtariffwizard_totalprice" type="text/x-jsrender">
+				{{if Cost > 0}}	
+					Итого: <strong>{{:Cost}}</strong>
+				{{else}}
+					{{:Error}} 
+				{{/if}}
+				</script>
+				
+				<button type="button" class="btn btn-info" id="addtariffwizard_action_getquote">Пересчитать стоимость</button>
+				<button type="button" class="btn btn-success" id="addtariffwizard_action_post">Подключить тариф</button>
+			</div>
+		</div>
+	</div>	
+</div>  
+ 
+</body>
+</html>
