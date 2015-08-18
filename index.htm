@@ -18,6 +18,18 @@
 		});
 	</script> 
 
+	<style type="text/css">
+	.list-group > a.disabled {
+	  color: #999999;
+	}
+	.list-group > a.disabled:hover,
+	.list-group > a.disabled:focus {
+	  color: #999999;
+	  text-decoration: none;
+	  background-color: transparent;
+	  cursor: not-allowed;
+	}	
+	</style>
 
 	<script type="text/javascript">
 	var locusername = "";
@@ -312,75 +324,96 @@
 			//set global var for further use
 			availabletariffs = data;
 			
-			var myTemplate = $.templates("#template_addtariffwizard_body_select_tarifflist");
-			$("#addtariffwizard_body_select_tarifflist").html(myTemplate.render(availabletariffs));
+			$.ajax({
+				url: privateapiurl() + "/mytariffs",
+				username: locusername,
+				password: locpassword
+			}).done(function(data, textStatus, jqXHR) {
 			
-			//Забиндим события на появившиеся элементы
-			$(".addtariffwizard_body_select_element").off("click");
-			$(".addtariffwizard_body_select_element").click(function() {
+				//enrich availabletariffs with client data (flag Inuse)
+				mytariffs = [];
+				$.each(data, function(i, item) {
+					mytariffs.push(item.Tariff.Id);
+				});
+				$.each(availabletariffs, function(i, item) {
+					if ($.inArray(item.TariffId, mytariffs) >= 0) {availabletariffs[i].Inuse = true;} else {availabletariffs[i].Inuse = false;}
+				});
 				
-				$("#addtariffwizard_body_select_tarifflist > a.addtariffwizard_body_select_element").removeClass("list-group-item-success");
-				$(this).addClass("list-group-item-success");
+			
+				var myTemplate = $.templates("#template_addtariffwizard_body_select_tarifflist");
+				$("#addtariffwizard_body_select_tarifflist").html(myTemplate.render(availabletariffs));
 				
-				
-				$("#addtariffwizard_action_post").removeClass("disabled");
-				
-				
-				tariff = $(this).attr("data");
-				$("#addtariffwizard_input_tariff").val(tariff);
-				
-				//find tariff in global var
-				var currenttariff = {};
-				$.each(availabletariffs, function(i, item){
-					if (item.TariffId == tariff) {
-						currenttariff = availabletariffs[i];
-						return false;
+				//Забиндим события на появившиеся элементы
+				$(".addtariffwizard_body_select_element").off("click");
+				$(".addtariffwizard_body_select_element").click(function() {
+					
+					tariff = $(this).attr("data");
+					if (tariff == undefined) {return false;}
+					
+					
+					$("#addtariffwizard_body_select_tarifflist > a.addtariffwizard_body_select_element").removeClass("list-group-item-success");
+					$(this).addClass("list-group-item-success");
+					
+					
+					$("#addtariffwizard_action_post").removeClass("disabled");
+					
+					
+					
+					$("#addtariffwizard_input_tariff").val(tariff);
+					
+					//find tariff in global var
+					var currenttariff = {};
+					$.each(availabletariffs, function(i, item){
+						if (item.TariffId == tariff) {
+							currenttariff = availabletariffs[i];
+							return false;
+						}
+					});
+					
+					
+					
+					//show modules
+					var myTemplate = $.templates("#template_addtariffwizard_modules_content");
+					$("#addtariffwizard_modules_content").html(myTemplate.render(currenttariff.Modules));
+					
+					//show options
+					if (currenttariff.Options.length > 0) {
+						var myTemplate = $.templates("#template_addtariffwizard_options_content");
+						$("#addtariffwizard_options_content").html(myTemplate.render(currenttariff.Options));
+					} else {
+						$("#addtariffwizard_options_content").html("<i>Нет доступных опций</i>");
 					}
-				});
-				
-				
-				
-				//show modules
-				var myTemplate = $.templates("#template_addtariffwizard_modules_content");
-				$("#addtariffwizard_modules_content").html(myTemplate.render(currenttariff.Modules));
-				
-				//show options
-				if (currenttariff.Options.length > 0) {
-					var myTemplate = $.templates("#template_addtariffwizard_options_content");
-					$("#addtariffwizard_options_content").html(myTemplate.render(currenttariff.Options));
-				} else {
-					$("#addtariffwizard_options_content").html("<i>Нет доступных опций</i>");
-				}
-				
-				//show nusers
-				$("#addtariffwizard_input_nusers").val(1);
-				
-				//show window
-				$("#addtariffwizard_body_adjust").show();
-				
-				
-				//bind actions
-				$("#addtariffwizard_action_getquote").off("click");
-				$("#addtariffwizard_action_getquote").click(function() {getquote_addtariff()});
-				
-				
-				$(".priceChangeTrigger").off("change");
-				$(".priceChangeTrigger").change(function() {getquote_addtariff()});
-				
-				$("#addtariffwizard_action_post").off("click");
-				$("#addtariffwizard_action_post").click(function() {
+					
+					//show nusers
+					$("#addtariffwizard_input_nusers").val(1);
+					
+					//show window
+					$("#addtariffwizard_body_adjust").show();
 					
 					
-					$("#addtariffwizard_action_post").addClass("disabled");
-					addtariff();
+					//bind actions
+					$("#addtariffwizard_action_getquote").off("click");
+					$("#addtariffwizard_action_getquote").click(function() {getquote_addtariff()});
+					
+					
+					$(".priceChangeTrigger").off("change");
+					$(".priceChangeTrigger").change(function() {getquote_addtariff()});
+					
+					$("#addtariffwizard_action_post").off("click");
+					$("#addtariffwizard_action_post").click(function() {
+						
+						
+						$("#addtariffwizard_action_post").addClass("disabled");
+						addtariff();
+						
+					});
+					
+					getquote_addtariff();
+					
 					
 				});
-				
-				getquote_addtariff();
-				
-				
-			});
 			
+			});
 			
 			$("#addtariffwizard_body_select").show();
 			$("#addtariffwizard_body_adjust").hide();
@@ -705,7 +738,7 @@
 			<div class="modal-body" id="addtariffwizard_body_select">
 				<div class="list-group" id="addtariffwizard_body_select_tarifflist"></div>
 				<script id="template_addtariffwizard_body_select_tarifflist" type="text/x-jsrender">
-					<a href="#" class="list-group-item addtariffwizard_body_select_element" data="{{:TariffId}}"><span class="badge">новый!</span>{{:TariffName}}</a>
+					<a href="#" class="list-group-item addtariffwizard_body_select_element {{if Inuse }}disabled{{/if}}" {{if !Inuse}}data="{{:TariffId}}"{{/if}}><span class="badge">{{if Inuse }}подключен{{/if}}</span>{{:TariffName}}</a>
 				</script>	
 			</div>
 			<div class="modal-body" id="addtariffwizard_body_adjust">
