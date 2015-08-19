@@ -173,7 +173,7 @@
 						$(".priceChangeTrigger").off("change");
 						$(".priceChangeTrigger").change(function() {getquote()});
 						
-						
+						//Button: Modify
 						$("#modifytariffwizard_action_post").removeClass("disabled");
 						$("#modifytariffwizard_action_post").off("click");
 						$("#modifytariffwizard_action_post").click(function() {
@@ -181,6 +181,13 @@
 							modifytariff();
 						});
 						
+						//Button: Stop
+						$("#modifytariffwizard_action_stop").removeClass("disabled");
+						$("#modifytariffwizard_action_stop").off("click");
+						$("#modifytariffwizard_action_stop").click(function() {
+							$("#modifytariffwizard_action_stop").addClass("disabled");
+							stoptariff();
+						});
 						
 						getquote();
 						
@@ -462,8 +469,24 @@
 	
 	}
 
-
-
+	function stoptariff() {
+	
+		var tariffId = $("#modifytariffwizard_input_tariff").val();
+	
+		$.ajax({
+			url: privateapiurl() + "/mytariffs/"+tariffId+"/stop",
+		}).done(function(data, textStatus, jqXHR) {
+		
+			$("#modifytariffwizard").modal('hide');
+			mytariffs();
+			myapplications();
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to modify tariff ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+			$("#modifytariffwizard_action_stop").removeClass("disabled");
+		});
+	
+	}
 
 
 
@@ -648,7 +671,7 @@
 								{{/for}}
 							<td></td>
 							<td>{{:Cost}}</td>
-							<td><button type="button" class="btn btn-warning ActionModifyTariff" data="{{:Tariff.Id}}">Изменить</button></td>
+							<td><button type="button" class="btn btn-warning ActionModifyTariff {{if Canceled}}disabled{{/if}}" data="{{:Tariff.Id}}">Изменить</button></td>
 						</tr>
 					</script>
 					</table>				
@@ -717,9 +740,13 @@
 					{{:Error}} 
 				{{/if}}
 				</script>
-				
-				<button type="button" class="btn btn-info" id="modifytariffwizard_action_getquote">Пересчитать стоимость</button>
-				<button type="button" class="btn btn-success" id="modifytariffwizard_action_post">Применить</button>
+				<div class="alert alert-success clearfix">
+					<button type="button" class="btn btn-info" id="modifytariffwizard_action_getquote">Пересчитать стоимость</button>
+					<button type="button" class="btn btn-success pull-right" id="modifytariffwizard_action_post">Установить новые параметры</button>
+				</div>
+				<div class="alert alert-danger clearfix">
+					<button type="button" class="btn btn-warning btn-sm pull-right" id="modifytariffwizard_action_stop">Отказаться от тарифа</button>
+				</div>
 			</div>
 		</div>
 	</div>	
