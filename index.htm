@@ -28,7 +28,13 @@
 	  text-decoration: none;
 	  background-color: transparent;
 	  cursor: not-allowed;
-	}	
+	}
+	
+	.table tbody>tr>td.vert-align{
+		vertical-align: middle;
+	}
+
+	
 	</style>
 
 	<script type="text/javascript">
@@ -36,6 +42,7 @@
 	var locpassword = "";
 	
 	var availabletariffs = [];
+	var userData = [];
 	
 	//helper to get GET PARAMS
 	function getParameterByName(name) {
@@ -50,6 +57,8 @@
 			username: locusername,
 			password: locpassword
 		}).done(function(data, textStatus, jqXHR) {
+		
+			$("#bg-video").remove();
 			$('#glNonAuthVisibility').hide();
 
 			$('#myModal').modal('hide');
@@ -65,6 +74,10 @@
 
 			mybalance();
 			$('#tab_main_balance_btnrefresh').click(function() {mybalance()});
+			
+			myemployees();
+			$('#tab_main_myemployees_btnrefresh').click(function() {myemployees()});
+			
 			
 			
 		}).fail(function(jqXHR, textStatus, errorThrown) {
@@ -489,6 +502,93 @@
 	}
 
 
+	function myemployees() {
+		$.ajax({
+			url: privateapiurl() + "/myemployees",
+			username: locusername,
+			password: locpassword
+		}).done(function(data, textStatus, jqXHR) {
+			
+			//save in global
+			userData = data;
+			
+			var myTemplate = $.templates("#template_myemployees_content");
+			$("#tab_main_myemployees_content_tablebody").html(myTemplate.render(data));
+			
+			//Забиндим события на появившиеся кнопки
+			$(".ActionModifyUserRights").off("click");
+			$(".ActionModifyUserRights").click(function() {
+				
+				user = $(this).attr("data");
+				
+				//go find user data in global data and save it to userAttrs
+				$.each(userData, function(i, item) {
+					if (item.Id == user) { 
+						userAttrs = userData[i]; 
+						return false;
+					}	
+				});				
+				
+				
+				var myTemplate = $.templates("#template_modifyuserrightswizard_header");
+				$("#modifyuserrightswizard_header").html(myTemplate.render(userAttrs));
+				
+				
+				$("#modifyuserrightswizard_input_user").val(userAttrs.Id);
+				
+				var myTemplate = $.templates("#template_modifyuserrightswizard_tableofrights_body");
+				$("#modifyuserrightswizard_tableofrights_body").html(myTemplate.render(userAttrs.Rights));
+				
+				
+				
+				$("#modifyuserrightswizard_action_apply").off("click");
+				$("#modifyuserrightswizard_action_apply").click(function() {
+					
+					$("#modifyuserrightswizard_action_apply").addClass("disabled");
+					
+					newrights = [];
+					
+					$(".modifyuserrightswizard_input_option").each(function() {
+						var elem = {
+							id : $(this).attr("data"),
+							right : $(this).val()
+						};
+						newrights.push(elem);
+					});
+				
+					$.ajax({
+						url: privateapiurl() + "/myemployees/" + user + "/applicationrights",
+						username: locusername,
+						password: locpassword,
+						data: {"data" : JSON.stringify(newrights)} 
+					}).done(function(data, textStatus, jqXHR) {
+					
+						$("#modifyuserrightswizard").modal('hide');
+						myemployees();
+						
+					}).fail(function(jqXHR, textStatus, errorThrown) {
+						alert("Unable to apply user rights ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+						$("#modifyuserrightswizard_action_apply").removeClass("disabled");
+					});
+						
+				
+				});
+				
+				
+				$("#modifyuserrightswizard_action_apply").removeClass("disabled");
+				$("#modifyuserrightswizard").modal('show');
+				
+				
+			});
+				
+					
+			
+			
+			
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to get users list ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	}
 
 
 
@@ -541,11 +641,22 @@
 	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
 
 <!-- NON AUTH VISIBILITY -->
-<div id="glNonAuthVisibility" class="container">
-	<button type="button" class="btn btn-primary btn-lg btn-block" data-toggle="modal" data-target="#myModal">
+
+<video id="bg-video" autoplay loop muted style="position: absolute; bottom: 0px; right: 0px; min-width: 100%; min-height: 100%; width: auto; height: auto; z-index: -999; overflow: hidden;">
+<source src="http://vodkabears.github.io/vide/video/ocean.mp4" type="video/mp4">
+<source src="http://vodkabears.github.io/vide/video/ocean.webm" type="video/webm">
+<source src="http://vodkabears.github.io/vide/video/ocean.ogv" type="video/ogg">
+</video>
+
+
+<div id="glNonAuthVisibility" style="position: absolute; top: 50%; left: 50%; z-index: 999; color: #fff; background: rgba(0,0,0,0.5); padding: 60px; width: 400px; height: 400px; border-radius: 50%; margin: -200px 0 0 -200px; text-align: center; vert-align: center;">
+	<a href="#" class="btn btn-link btn-lg" data-toggle="modal" data-target="#myModal" style="margin-top: 100px;">
 	  Начать пользоваться сервисом
-	</button>
+	</a>
 </div>
+
+
+
 
 <!-- Modal login -->
 <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
@@ -655,7 +766,7 @@
 					</tbody>
 				  	<script id="template_mytariffs_content" type="text/x-jsrender">
 						<tr>
-							<td>{{:Canceled}}</td>
+						<td>{{:Canceled}}</td>
 							<td>{{:Blocked}}</td>
 							<td><strong>{{:Tariff.Name}}</strong><br />
 							Длительность: <strong>{{:Tariff.Periodicity}}</strong><br />
@@ -666,10 +777,11 @@
 									{{:Name}}<br />
 								{{/for}}
 							</td>
+							<td>
 								{{for Options}}
 									{{:Name}}<br />
 								{{/for}}
-							<td></td>
+							</td>
 							<td>{{:Cost}}</td>
 							<td><button type="button" class="btn btn-warning ActionModifyTariff {{if Canceled}}disabled{{/if}}" data="{{:Tariff.Id}}">Изменить</button></td>
 						</tr>
@@ -692,7 +804,34 @@
 			</div>
             <div class="tab-pane" id="tab_employees">
                 <h1>Сотрудники и права</h1>
-                <p>yellow yellow yellow yellow yellow</p>
+					<button type="button" class="btn btn-success" id="tab_main_myemployees_btnrefresh">Обновить</button>
+					<table class="table">
+					<thead>
+					  <tr>
+						<th>Имя</th>
+						<th>Почта</th>
+						<th></th>
+						<th>Доступы</th>
+						<th></th>
+					  </tr>
+					</thead>
+					<tbody id="tab_main_myemployees_content_tablebody">
+					</tbody>
+				  	<script id="template_myemployees_content" type="text/x-jsrender">
+						<tr class="{{if Blocked}}danger{{else}}success{{/if}}">
+							<td class="vert-align">{{:Name}}</td>
+							<td class="vert-align">{{:Mail}}</td>
+							<td class="vert-align"><button type="button" class="btn btn-warning ActionModifyUser" data="{{:Id}}">Изменить данные</button></td>
+							<td class="vert-align">{{if Blocked}}<em>(заблокирован)</em>{{else}}
+									{{for Rights}}
+									{{:Name}} : <mark>{{:Right}}</mark><br />
+									{{/for}}
+								{{/if}}
+							</td>
+							<td class="vert-align"><button type="button" class="btn btn-warning ActionModifyUserRights" data="{{:Id}}">{{if Blocked}}Разблокировать{{else}}Изменить доступы{{/if}}</button></td>
+						</tr>
+					</script>
+					</table>				
             </div>
             <div class="tab-pane" id="tab_support">
                 <h1>Поддержка и FAQ</h1>
@@ -807,11 +946,11 @@
 				<div class="alert alert-info" id="addtariffwizard_totalprice"></div>				
 				
 				<script id="template_addtariffwizard_totalprice" type="text/x-jsrender">
-				{{if Cost > 0}}	
-					Итого: <strong>{{:Cost}}</strong>
-				{{else}}
-					{{:Error}} 
-				{{/if}}
+					{{if Cost > 0}}	
+						Итого: <strong>{{:Cost}}</strong>
+					{{else}}
+						{{:Error}} 
+					{{/if}}
 				</script>
 				
 				<button type="button" class="btn btn-info" id="addtariffwizard_action_getquote">Пересчитать стоимость</button>
@@ -819,7 +958,57 @@
 			</div>
 		</div>
 	</div>	
-</div>  
+</div>
+
+
+
+
+<!-- MODAL - MODIFY USER RIGHTS -->
+<div id="modifyuserrightswizard" class="modal fade" tabindex="-1" role="dialog">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal">X</button>
+				<h4 class="modal-title">Изменение прав пользователя</h4>
+			</div>
+			<div class="modal-body" id="modifyuserrightswizard_body_adjust">
+				<div id="modifyuserrightswizard_header"></div>
+				<script id="template_modifyuserrightswizard_header" type="text/x-jsrender">
+					<p class="bg-info">Показаны права для: {{:Name}}</p>
+					{{if Blocked}}
+					<p class="bg-danger">Важно! Доступ полностью заблокирован</p>
+					{{/if}}
+				</script>
+				
+				<input type="hidden" id="modifyuserrightswizard_input_user">
+				<table class="table">
+					<tbody id="modifyuserrightswizard_tableofrights_body"></tbody>
+					<script id="template_modifyuserrightswizard_tableofrights_body" type="text/x-jsrender">
+						<tr>	
+							<td>{{:Name}}</td>
+							<td>
+								<div class="form-group">
+								  <select class="form-control modifyuserrightswizard_input_option" data="{{:Id}}">
+									<option value="Запуск и администрирование" {{if Right=="Запуск и администрирование"}}selected{{/if}}>Запуск и администрирование</option>
+									<option value="Запуск" {{if Right=="Запуск"}}selected{{/if}}>Запуск</option>
+									<option value="Нет" {{if Right=="Нет"}}selected{{/if}}>Нет</option>
+								  </select>
+								</div>
+							</td>
+						</tr>
+					</script>
+				</table>				
+				
+				
+				<div class="alert alert-success clearfix">
+					<!--<button type="button" class="btn btn-warning" id="modifyuserrightswizard_action_block">Заблокировать</button>-->
+					<button type="button" class="btn btn-success pull-right" id="modifyuserrightswizard_action_apply">Применить права</button>
+				</div>
+			</div>
+		</div>
+	</div>	
+</div> 
+  
  
 </body>
 </html>
