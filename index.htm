@@ -78,6 +78,14 @@
 			myemployees();
 			$('#tab_main_myemployees_btnrefresh').click(function() {myemployees()});
 			
+			mysessions();
+			$('#tab_main_sessions_btnrefresh').click(function() {mysessions()});
+			
+			//set updating sessions every 20sec
+			(function pollMySessions() {
+				mysessions();
+			    setTimeout(pollMySessions, 20000);
+			}());			
 			
 			
 		}).fail(function(jqXHR, textStatus, errorThrown) {
@@ -591,6 +599,31 @@
 	}
 
 
+	
+	
+	function mysessions() {
+		$.ajax({
+			url: privateapiurl() + "/myemployees/sessions",
+			username: locusername,
+			password: locpassword
+		}).done(function(data, textStatus, jqXHR) {
+						
+			var myTemplate = $.templates("#template_sessions_content_tablebody");
+			$("#tab_main_sessions_content_tablebody").html(myTemplate.render(data));
+	
+	
+		}).fail(function(jqXHR, textStatus, errorThrown) {
+			alert("Unable to get users list ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+		});
+	}
+	
+	
+	
+	
+	
+	
+	
+	
 
 	
 	
@@ -803,7 +836,8 @@
 				
 			</div>
             <div class="tab-pane" id="tab_employees">
-                <h1>Сотрудники и права</h1>
+				<div>
+					<h2>Сотрудники и права</h2>
 					<button type="button" class="btn btn-success" id="tab_main_myemployees_btnrefresh">Обновить</button>
 					<table class="table">
 					<thead>
@@ -831,7 +865,33 @@
 							<td class="vert-align"><button type="button" class="btn btn-warning ActionModifyUserRights" data="{{:Id}}">{{if Blocked}}Разблокировать{{else}}Изменить доступы{{/if}}</button></td>
 						</tr>
 					</script>
-					</table>				
+					</table>
+				</div>
+				<div>
+					<h2>Текущие подключенные пользователи</h2>
+					<button type="button" class="btn btn-success" id="tab_main_sessions_btnrefresh">Обновить</button><em> (автообновление списка каждые 20 секунд)</em>
+					<table class="table">
+					<thead>
+					  <tr>
+						<th>Имя</th>
+						<th>Почта</th>
+						<th>Приложение</th>
+						<th></th>
+					  </tr>
+					</thead>
+					<tbody id="tab_main_sessions_content_tablebody">
+					</tbody>
+				  	<script id="template_sessions_content_tablebody" type="text/x-jsrender">
+						<tr>
+							<td class="vert-align">{{:User.Name}}</td>
+							<td class="vert-align">{{:User.Mail}}</td>
+							<td class="vert-align">{{:Application.Name}}</td>
+							<!-- <td class="vert-align"><button type="button" class="btn btn-warning ActionDropSession" data="{{:Id}}">Изменить данные</button></td>-->
+						</tr>
+					</script>
+					</table>
+				</div>
+				
             </div>
             <div class="tab-pane" id="tab_support">
                 <h1>Поддержка и FAQ</h1>
