@@ -22,7 +22,7 @@
 		
 		function recoverpassword() {
 			$.ajax({
-				url: publicapiurl() + "/restorepassword/" + locmail
+				url: publicapiurl() + "/account/password/restore/" + locmail
 			}).done(function(data, textStatus, jqXHR) {
 				if (data["result"]) {$("#resulttext").html("<p>Письмо со ссылкой для продолжения отправлено</p>");}
 				else {$("#resulttext").html("Не удалось восстановить пароль: " + data["errorname"]);}

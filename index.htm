@@ -68,6 +68,9 @@
 			myapplications();
 			$('#tab_main_myapplications_btnrefresh').click(function() {myapplications()});
 
+			$('#tab_main_myprofile_btnchangemypassword').click(function() {changemypassword_prepare()});
+			
+			
 			mytariffs();
 			$('#tab_main_mytariffs_btnrefresh').click(function() {mytariffs()});
 			$('#tab_main_mytariffs_btnadd').click(function() {addtariff_prepare()});
@@ -607,9 +610,34 @@
 			username: locusername,
 			password: locpassword
 		}).done(function(data, textStatus, jqXHR) {
-						
-			var myTemplate = $.templates("#template_sessions_content_tablebody");
-			$("#tab_main_sessions_content_tablebody").html(myTemplate.render(data));
+			
+			if ($.isEmptyObject(data)) {
+				$("#tab_main_sessions_content_tablebody").html("");
+			} else {
+				var myTemplate = $.templates("#template_sessions_content_tablebody");
+				$("#tab_main_sessions_content_tablebody").html(myTemplate.render(data));
+			}
+			
+			
+			$(".ActionDropSession").off("click");
+			$(".ActionDropSession").click(function() {
+			
+				sessionid = $(this).attr("data");
+			
+				$.ajax({
+					url: privateapiurl() + "/myemployees/sessions/" + sessionid + "/drop",
+					username: locusername,
+					password: locpassword
+				}).done(function(data, textStatus, jqXHR) {
+				
+					mysessions();
+					
+				}).fail(function(jqXHR, textStatus, errorThrown) {
+					alert("Unable to drop session ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+				});
+			
+			});
+			
 	
 	
 		}).fail(function(jqXHR, textStatus, errorThrown) {
@@ -618,8 +646,39 @@
 	}
 	
 	
+	function changemypassword_prepare() {
+
+		$("#modifymypassword_action_apply").off("click");
+		$("#modifymypassword_action_apply").click(function() {changemypassword_apply()});			
+			
+		$("#modifymypasswordwizard").modal('show');	
+
+	}
 	
+	function changemypassword_apply() {
 	
+		var password1 = $("#modifymypassword_input_password1").val();
+		var password2 = $("#modifymypassword_input_password2").val();
+	
+		if (password1 == password2) {
+			
+			$.ajax({
+				url: privateapiurl() + "/account/password/change/"+password1
+			}).done(function(data, textStatus, jqXHR) {
+			
+				locpassword = password1;
+				$("#modifymypasswordwizard").modal('hide');
+
+				
+			}).fail(function(jqXHR, textStatus, errorThrown) {
+				alert("Unable to change passwod ||" +textStatus + "," + errorThrown + "," + jqXHR.responseText);
+			});		
+		
+		} else {
+			alert("Пароли не совпадают!")
+		}
+	
+	}	
 	
 	
 	
@@ -753,7 +812,7 @@
         </ul>
         <div id="my-tab-content" class="tab-content">
             <div class="tab-pane active" id="tab_main">
-                <h1>Main info</h1>
+                <h1>Главное</h1>
 				<div id="tab_main_myapplications_content">
 					<h2>Мои приложения</h2>
 					<button type="button" class="btn btn-success" id="tab_main_myapplications_btnrefresh">Обновить</button>
@@ -775,6 +834,11 @@
 						</tr>
 					</script>
 					</table>				
+				</div>
+				
+				<div id="tab_main_myprofile_content">
+					<h2>Мой профиль</h2>
+					<button type="button" class="btn btn-warning" id="tab_main_myprofile_btnchangemypassword">Сменить пароль</button>
 				</div>
             </div>
             <div class="tab-pane" id="tab_tariffs">
@@ -886,7 +950,7 @@
 							<td class="vert-align">{{:User.Name}}</td>
 							<td class="vert-align">{{:User.Mail}}</td>
 							<td class="vert-align">{{:Application.Name}}</td>
-							<!-- <td class="vert-align"><button type="button" class="btn btn-warning ActionDropSession" data="{{:Id}}">Изменить данные</button></td>-->
+							<!--<td class="vert-align"><button type="button" class="btn btn-danger ActionDropSession" data="{{:Id}}">Сбросить сеанс</button></td>-->
 						</tr>
 					</script>
 					</table>
@@ -1069,6 +1133,30 @@
 	</div>	
 </div> 
   
+ 
+ 
+<!-- MODAL - CHANGE MY PASSWORD -->
+<div id="modifymypasswordwizard" class="modal fade" tabindex="-1" role="dialog">
+	<div class="modal-dialog" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal">X</button>
+				<h4 class="modal-title">Изменение пароля</h4>
+			</div>
+			<div class="modal-body" id="modifymypassword_body_adjust">
+				
+				<div class="alert alert-success">Введите пароль: <input type="password" id="modifymypassword_input_password1"></div>
+				<div class="alert alert-success">Еще раз пароль: <input type="password" id="modifymypassword_input_password2"></div>
+				
+				<div class="alert alert-success clearfix">
+					<!--<button type="button" class="btn btn-warning" id="modifyuserrightswizard_action_block">Заблокировать</button>-->
+					<button type="button" class="btn btn-success pull-right" id="modifymypassword_action_apply">Сохранить</button>
+				</div>
+			</div>
+		</div>
+	</div>	
+</div>  
+ 
  
 </body>
 </html>
